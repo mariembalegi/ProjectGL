@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './Login.css';
 import Welcome from './Welcome';
+import DashboardAdmin from './DashboardAdmin';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -11,12 +12,21 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState('');
 
-  // Utilisateur statique autorisé
-  const staticUser = {
-    email: 'meriem.balegi@etudiant-enit.utm.tn',
-    password: 'mariem12'
-  };
+  // Utilisateurs statiques autorisés
+  const staticUsers = [
+    {
+      email: 'meriem.balegi@etudiant-enit.utm.tn',
+      password: 'mariem12',
+      role: 'enseignant chercheur'
+    },
+    {
+      email: 'hazem.haddar@etudiant-enit.utm.tn',
+      password: 'hazem12',
+      role: 'admin'
+    }
+  ];
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -28,35 +38,47 @@ const Login = () => {
     if (error) setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
+    // Validation locale uniquement - PAS de backend
+    const emailInput = formData.email.trim();
+    const passwordInput = formData.password.trim();
+    
+    console.log('=== VALIDATION FRONTEND UNIQUEMENT ===');
+    console.log('Email saisi:', emailInput);
+    console.log('Password saisi:', passwordInput);
+    
+    // Rechercher l'utilisateur dans le tableau local
+    const user = staticUsers.find(u => 
+      u.email === emailInput && u.password === passwordInput
+    );
+    
+    console.log('Utilisateur trouvé:', user);
+    
     // Simulation d'un délai de traitement
     setTimeout(() => {
-      // Vérification des identifiants statiques avec trim pour éviter les espaces
-      const emailInput = formData.email.trim();
-      const passwordInput = formData.password.trim();
-      
-      console.log('Email saisi:', emailInput);
-      console.log('Password saisi:', passwordInput);
-      console.log('Email attendu:', staticUser.email);
-      console.log('Password attendu:', staticUser.password);
-      
-      if (emailInput === staticUser.email && passwordInput === staticUser.password) {
-        // Connexion réussie
+      if (user) {
+        console.log('✅ Connexion réussie:', user.email, 'Rôle:', user.role);
+        setUserRole(user.role);
         setIsLoggedIn(true);
       } else {
-        setError('Invalid credentials. Please check your email and password.');
+        console.log('❌ Échec de connexion');
+        setError('Identifiants invalides. Vérifiez votre email et mot de passe.');
       }
       setIsLoading(false);
     }, 1000);
   };
 
-  // Si l'utilisateur est connecté, afficher la page Welcome
+  // Si l'utilisateur est connecté, afficher la page correspondante selon son rôle
   if (isLoggedIn) {
-    return <Welcome />;
+    if (userRole === 'admin') {
+      return <DashboardAdmin />;
+    } else {
+      return <Welcome />;
+    }
   }
 
   return (
