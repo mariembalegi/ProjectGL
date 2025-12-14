@@ -147,15 +147,6 @@ const Welcome = () => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Données fictives pour le dashboard
-  const stats = [
-    { title: 'Total Requests', value: 20, color: '#3B82F6' },
-    { title: 'In Progress', value: 20, color: '#F59E0B' },
-    { title: 'To Modify', value: 0, color: '#8B5CF6' },
-    { title: 'Approved', value: 0, color: '#10B981' },
-    { title: 'Rejected', value: 0, color: '#EF4444' }
-  ];
-
   const [conventions, setConventions] = useState([
     {
       id: 1,
@@ -318,6 +309,15 @@ const Welcome = () => {
       statut: 'In Progress'
     }
   ]);
+
+  // Données fictives pour le dashboard - calculated dynamically
+  const stats = [
+    { title: 'Total Requests', value: conventions.length, color: '#3B82F6' },
+    { title: 'In Progress', value: conventions.filter(c => c.statut === 'In Progress').length, color: '#F59E0B' },
+    { title: 'To Modify', value: conventions.filter(c => c.statut === 'To Modify').length, color: '#8B5CF6' },
+    { title: 'Approved', value: conventions.filter(c => c.statut === 'Approved').length, color: '#10B981' },
+    { title: 'Rejected', value: conventions.filter(c => c.statut === 'Rejected').length, color: '#EF4444' }
+  ];
 
   const getStatusBadge = (statut) => {
     const statusClasses = {
