@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './DashboardAdmin.css';
 
+const departments = ['TIC', 'MATHEMATIC', 'ELECTRONIC', 'MECANIC', 'CIVIL', 'INDUSTRIAL'];
+
 const initialUsers = [
-  { id: 1, name: 'Alice Martin', email: 'alice@example.com', password: 'pass123', role: 'enseignant', department: 'Math', active: true },
+  { id: 1, name: 'Alice Martin', email: 'alice@example.com', password: 'pass123', role: 'teacher', department: 'MATHEMATIC', active: true },
   { id: 2, name: 'Bob Durand', email: 'bob@example.com', password: 'adminpass', role: 'admin', department: 'Administration', active: true },
-  { id: 3, name: 'Carla Lopez', email: 'carla@example.com', password: 'secret', role: 'enseignant', department: 'Physics', active: false },
+  { id: 3, name: 'Carla Lopez', email: 'carla@example.com', password: 'secret', role: 'teacher', department: 'TIC', active: false },
 ];
 
 const initialProjects = [
@@ -21,7 +23,7 @@ const DashboardAdmin = () => {
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [selectedProjectsUser, setSelectedProjectsUser] = useState(null);
 
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'enseignant', department: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'teacher', department: '' });
 
   useEffect(() => {
     // Load projects from localStorage
@@ -55,28 +57,28 @@ const DashboardAdmin = () => {
   };
 
   const handleDelete = (id) => {
-    if (!window.confirm('Supprimer cet utilisateur ?')) return;
+    if (!window.confirm('Delete this user?')) return;
     setUsers(prev => prev.filter(u => u.id !== id));
   };
 
   const addTeacher = () => {
-    if (!form.name || !form.email) return alert('Nom et email requis');
+    if (!form.name || !form.email || !form.department) return alert('Name, email, and department are required');
     const newUser = {
       id: Date.now(),
       name: form.name,
       email: form.email,
       password: form.password || 'changeme',
-      role: 'enseignant',
-      department: form.department || 'Général',
+      role: 'teacher',
+      department: form.department,
       active: true,
     };
     setUsers(prev => [newUser, ...prev]);
-    setForm({ name: '', email: '', password: '', role: 'enseignant', department: '' });
+    setForm({ name: '', email: '', password: '', role: 'teacher', department: '' });
     setShowAddTeacher(false);
   };
 
   const addAdmin = () => {
-    if (!form.name || !form.email || !form.password) return alert('Nom, email et mot de passe requis');
+    if (!form.name || !form.email || !form.password) return alert('Name, email, and password are required');
     const newUser = {
       id: Date.now(),
       name: form.name,
@@ -87,7 +89,7 @@ const DashboardAdmin = () => {
       active: true,
     };
     setUsers(prev => [newUser, ...prev]);
-    setForm({ name: '', email: '', password: '', role: 'enseignant', department: '' });
+    setForm({ name: '', email: '', password: '', role: 'teacher', department: '' });
     setShowAddAdmin(false);
   };
 
@@ -102,7 +104,7 @@ const DashboardAdmin = () => {
   const closeProjects = () => setSelectedProjectsUser(null);
 
   const toggleAdmin = (id) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, role: u.role === 'admin' ? 'user' : 'admin' } : u));
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, role: u.role === 'admin' ? 'teacher' : 'admin' } : u));
   };
 
   const toggleActive = (id) => {
@@ -119,19 +121,19 @@ const DashboardAdmin = () => {
     <div className="admin-dashboard-container">
       <div className="logout-button-container">
         <button className="logout-btn" onClick={handleLogout}>
-          Déconnexion
+          Logout
         </button>
       </div>
 
       <header className="admin-header">
-        <h1>Tableau de bord - Admin</h1>
-        <p className="subtitle">Gestion des utilisateurs et statistiques rapides</p>
+        <h1>Admin Dashboard</h1>
+        <p className="subtitle">User Management & Quick Statistics</p>
       </header>
 
       <section className="stats-row">
         <div className="stat-card">
           <div className="stat-value">{stats.total}</div>
-          <div className="stat-label">Utilisateurs</div>
+          <div className="stat-label">Users</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{stats.admins}</div>
@@ -139,7 +141,7 @@ const DashboardAdmin = () => {
         </div>
         <div className="stat-card">
           <div className="stat-value">{stats.active}</div>
-          <div className="stat-label">Actifs</div>
+          <div className="stat-label">Active</div>
         </div>
       </section>
 
@@ -147,25 +149,23 @@ const DashboardAdmin = () => {
         <div className="users-controls">
           <input
             type="search"
-            placeholder="Rechercher par nom, email ou rôle"
+            placeholder="Search by name, email or role"
             value={query}
             onChange={e => setQuery(e.target.value)}
             className="search-input"
           />
-          <button className="btn" onClick={() => setShowAddTeacher(true)}>Ajouter Enseignant</button>
-          <button className="btn" onClick={() => setShowAddAdmin(true)}>Ajouter Admin</button>
-          <div className="users-count">Résultats: {filtered.length}</div>
+          <button className="btn" onClick={() => setShowAddTeacher(true)}>Add Teacher</button>
+          <button className="btn" onClick={() => setShowAddAdmin(true)}>Add Admin</button>
+          <div className="users-count">Results: {filtered.length}</div>
         </div>
 
         <table className="users-table">
           <thead>
             <tr>
-              <th>Nom</th>
+              <th>Name</th>
               <th>Email</th>
-              <th>Mot de passe</th>
-              <th>Rôle</th>
-              <th>Département</th>
-              <th>Actif</th>
+              <th>Password</th>
+              <th>Role</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -176,23 +176,21 @@ const DashboardAdmin = () => {
                 <td>{user.email}</td>
                 <td>{user.password || '—'}</td>
                 <td>{user.role}</td>
-                <td>{user.department || '—'}</td>
-                <td>{user.active ? 'Oui' : 'Non'}</td>
                 <td>
                   <button className="btn small" onClick={() => toggleAdmin(user.id)}>
-                    {user.role === 'admin' ? 'Retirer admin' : 'Promouvoir'}
+                    {user.role === 'admin' ? 'Remove Admin' : 'Promote'}
                   </button>
                   <button className="btn small" onClick={() => toggleActive(user.id)}>
-                    {user.active ? 'Désactiver' : 'Activer'}
+                    {user.active ? 'Deactivate' : 'Activate'}
                   </button>
-                  <button className="btn danger small" onClick={() => handleDelete(user.id)}>Supprimer</button>
-                  <button className="btn small" onClick={() => openProjectsForUser(user.id)}>Voir projets</button>
+                  <button className="btn danger small" onClick={() => handleDelete(user.id)}>Delete</button>
+                  <button className="btn small" onClick={() => openProjectsForUser(user.id)}>View Projects</button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan="7" className="no-results">Aucun utilisateur trouvé</td>
+                <td colSpan="5" className="no-results">No users found</td>
               </tr>
             )}
           </tbody>
@@ -202,24 +200,24 @@ const DashboardAdmin = () => {
       <section className="projects-section" style={{ marginTop: '1rem' }}>
         <div className="section-header">
           <div className="section-title">
-            <h2>Projets des Enseignants</h2>
-            <p>Statut des projets soumis par les enseignants</p>
+            <h2>Teacher Projects</h2>
+            <p>Status of projects submitted by teachers</p>
           </div>
         </div>
         <div style={{ padding: '1rem' }}>
           <table className="users-table">
             <thead>
               <tr>
-                <th>Titre</th>
-                <th>Enseignant</th>
-                <th>Statut</th>
+                <th>Title</th>
+                <th>Teacher</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {projects.filter(p => {
                 const author = users.find(u => u.id === p.authorId);
-                return author && author.role === 'enseignant';
+                return author && author.role === 'teacher';
               }).map(p => {
                 const author = users.find(u => u.id === p.authorId) || { name: 'Inconnu' };
                 return (
@@ -228,9 +226,9 @@ const DashboardAdmin = () => {
                     <td>{author.name}</td>
                     <td>{p.status}</td>
                     <td>
-                      <button className="btn small" onClick={() => changeProjectStatus(p.id, 'approved')}>Approuver</button>
-                      <button className="btn small" onClick={() => changeProjectStatus(p.id, 'rejected')}>Rejeter</button>
-                      <button className="btn small" onClick={() => changeProjectStatus(p.id, 'pending')}>Remettre</button>
+                      <button className="btn small" onClick={() => changeProjectStatus(p.id, 'approved')}>Approve</button>
+                      <button className="btn small" onClick={() => changeProjectStatus(p.id, 'rejected')}>Reject</button>
+                      <button className="btn small" onClick={() => changeProjectStatus(p.id, 'pending')}>Reset</button>
                     </td>
                   </tr>
                 );
@@ -244,18 +242,23 @@ const DashboardAdmin = () => {
       {showAddTeacher && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h3>Ajouter Enseignant</h3>
-            <label>Nom</label>
+            <h3>Add Teacher</h3>
+            <label>Name</label>
             <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
             <label>Email</label>
             <input value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-            <label>Mot de passe</label>
+            <label>Password</label>
             <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
-            <label>Département</label>
-            <input value={form.department} onChange={e => setForm({...form, department: e.target.value})} />
+            <label>Department</label>
+            <select value={form.department} onChange={e => setForm({...form, department: e.target.value})}>
+              <option value="">Select Department</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
             <div className="modal-actions">
-              <button className="btn" onClick={addTeacher}>Ajouter</button>
-              <button className="btn" onClick={() => setShowAddTeacher(false)}>Annuler</button>
+              <button className="btn" onClick={addTeacher}>Add</button>
+              <button className="btn" onClick={() => setShowAddTeacher(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -265,16 +268,16 @@ const DashboardAdmin = () => {
       {showAddAdmin && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h3>Ajouter Admin</h3>
-            <label>Nom</label>
+            <h3>Add Admin</h3>
+            <label>Name</label>
             <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
             <label>Email</label>
             <input value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-            <label>Mot de passe</label>
+            <label>Password</label>
             <input type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
             <div className="modal-actions">
-              <button className="btn" onClick={addAdmin}>Ajouter Admin</button>
-              <button className="btn" onClick={() => setShowAddAdmin(false)}>Annuler</button>
+              <button className="btn" onClick={addAdmin}>Add Admin</button>
+              <button className="btn" onClick={() => setShowAddAdmin(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -284,21 +287,21 @@ const DashboardAdmin = () => {
       {selectedProjectsUser && (
         <div className="modal-backdrop">
           <div className="modal large">
-            <h3>Projets de {users.find(u => u.id === selectedProjectsUser)?.name || 'Utilisateur'}</h3>
+            <h3>Projects of {users.find(u => u.id === selectedProjectsUser)?.name || 'User'}</h3>
             <div>
               {projects.filter(p => p.authorId === selectedProjectsUser).map(p => (
                 <div key={p.id} className="project-item">
                   <div className="project-title">{p.title}</div>
                   <div className="project-status">{p.status}</div>
                   <div className="project-actions">
-                    <button className="btn small" onClick={() => changeProjectStatus(p.id, 'approved')}>Approuver</button>
-                    <button className="btn small" onClick={() => changeProjectStatus(p.id, 'rejected')}>Rejeter</button>
+                    <button className="btn small" onClick={() => changeProjectStatus(p.id, 'approved')}>Approve</button>
+                    <button className="btn small" onClick={() => changeProjectStatus(p.id, 'rejected')}>Reject</button>
                   </div>
                 </div>
               ))}
             </div>
             <div className="modal-actions">
-              <button className="btn" onClick={closeProjects}>Fermer</button>
+              <button className="btn" onClick={closeProjects}>Close</button>
             </div>
           </div>
         </div>
