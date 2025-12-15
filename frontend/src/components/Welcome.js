@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Welcome.css';
 import './Modal.css';
-import { createRequest, getAllRequests } from '../services/api';
+import { createRequest, getTeacherRequests } from '../services/api';
 
 const Welcome = () => {
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
@@ -190,7 +190,20 @@ const Welcome = () => {
     const loadRequests = async () => {
       try {
         setLoading(true);
-        const result = await getAllRequests();
+        
+        // Get teacher ID from localStorage
+        const teacherId = localStorage.getItem('userId');
+        
+        if (!teacherId) {
+          console.warn('No teacher ID found in localStorage');
+          return;
+        }
+        
+        console.log('Loading requests for teacher ID:', teacherId);
+        
+        // Fetch teacher-specific requests
+        const result = await getTeacherRequests(teacherId);
+        
         if (result.success && result.data) {
           // Map backend format to frontend format
           const mappedConventions = result.data.map(request => ({
@@ -198,7 +211,7 @@ const Welcome = () => {
             titre: request.title,
             chercheur: request.description,
             type: request.type,
-            date: new Date(request.createdAt).toLocaleDateString('en-GB', { 
+            date: new Date(request.created_at).toLocaleDateString('en-GB', { 
               day: '2-digit', 
               month: 'short', 
               year: 'numeric' 
@@ -207,6 +220,7 @@ const Welcome = () => {
             documents: request.documents || []
           }));
           setConventions(mappedConventions);
+          console.log('Loaded requests:', mappedConventions);
         }
       } catch (error) {
         console.error('Error loading requests:', error);

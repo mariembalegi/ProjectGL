@@ -1,18 +1,40 @@
-const Request = require('../models/Request');
+const { pool } = require('../db/connection');
 const fs = require('fs');
 const path = require('path');
 
-// In-memory storage (replace with database later)
-let requests = [];
-let requestIdCounter = 1;
-
 // Get all requests
-const getAllRequests = (req, res) => {
+const getAllRequests = async (req, res) => {
   try {
+    const connection = await pool.getConnection();
+    
+    const [requests] = await connection.query(
+      `SELECT r.*, GROUP_CONCAT(
+        JSON_OBJECT(
+          'id', d.id,
+          'fileName', d.file_name,
+          'originalName', d.file_name,
+          'path', d.file_path,
+          'size', d.file_size,
+          'uploadedAt', d.uploaded_at
+        )
+      ) as documents FROM requests r 
+      LEFT JOIN request_documents d ON r.id = d.request_id 
+      GROUP BY r.id 
+      ORDER BY r.created_at DESC`
+    );
+
+    // Parse documents JSON
+    const formattedRequests = requests.map(req => ({
+      ...req,
+      documents: req.documents ? JSON.parse(`[${req.documents}]`) : []
+    }));
+
+    connection.release();
+    
     res.json({
       success: true,
-      data: requests,
-      count: requests.length
+      data: formattedRequests,
+      count: formattedRequests.length
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -20,15 +42,41 @@ const getAllRequests = (req, res) => {
 };
 
 // Get requests by teacher
-const getRequestsByTeacher = (req, res) => {
+const getRequestsByTeacher = async (req, res) => {
   try {
     const { teacherId } = req.params;
-    const teacherRequests = requests.filter(r => r.teacherId == teacherId);
+    const connection = await pool.getConnection();
+    
+    const [requests] = await connection.query(
+      `SELECT r.*, GROUP_CONCAT(
+        JSON_OBJECT(
+          'id', d.id,
+          'fileName', d.file_name,
+          'originalName', d.file_name,
+          'path', d.file_path,
+          'size', d.file_size,
+          'uploadedAt', d.uploaded_at
+        )
+      ) as documents FROM requests r 
+      LEFT JOIN request_documents d ON r.id = d.request_id 
+      WHERE r.teacher_id = ? 
+      GROUP BY r.id 
+      ORDER BY r.created_at DESC`,
+      [teacherId]
+    );
+
+    // Parse documents JSON
+    const formattedRequests = requests.map(req => ({
+      ...req,
+      documents: req.documents ? JSON.parse(`[${req.documents}]`) : []
+    }));
+
+    connection.release();
     
     res.json({
       success: true,
-      data: teacherRequests,
-      count: teacherRequests.length
+      data: formattedRequests,
+      count: formattedRequests.length
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -36,14 +84,39 @@ const getRequestsByTeacher = (req, res) => {
 };
 
 // Get single request by ID
-const getRequestById = (req, res) => {
+const getRequestById = async (req, res) => {
   try {
     const { id } = req.params;
-    const request = requests.find(r => r.id == id);
+    const connection = await pool.getConnection();
     
-    if (!request) {
+    const [requests] = await connection.query(
+      `SELECT r.*, GROUP_CONCAT(
+        JSON_OBJECT(
+          'id', d.id,
+          'fileName', d.file_name,
+          'originalName', d.file_name,
+          'path', d.file_path,
+          'size', d.file_size,
+          'uploadedAt', d.uploaded_at
+        )
+      ) as documents FROM requests r 
+      LEFT JOIN request_documents d ON r.id = d.request_id 
+      WHERE r.id = ? 
+      GROUP BY r.id`,
+      [id]
+    );
+
+    if (!requests || requests.length === 0) {
+      connection.release();
       return res.status(404).json({ success: false, error: 'Request not found' });
     }
+
+    const request = {
+      ...requests[0],
+      documents: requests[0].documents ? JSON.parse(`[${requests[0].documents}]`) : []
+    };
+
+    connection.release();
     
     res.json({ success: true, data: request });
   } catch (error) {
@@ -52,7 +125,7 @@ const getRequestById = (req, res) => {
 };
 
 // Create new request
-const createRequest = (req, res) => {
+const createRequest = async (req, res) => {
   try {
     const { title, type, description, teacherId } = req.body;
 
@@ -64,34 +137,53 @@ const createRequest = (req, res) => {
       });
     }
 
-    // Handle file uploads
-    let documents = [];
-    if (req.files && req.files.length > 0) {
-      documents = req.files.map(file => ({
-        originalName: file.originalname,
-        fileName: file.filename,
-        path: file.path,
-        size: file.size,
-        uploadedAt: new Date()
-      }));
-    }
-
-    // Create new request
-    const newRequest = new Request(
-      requestIdCounter++,
-      title,
-      type,
-      description,
-      teacherId,
-      documents,
-      'In Progress',
-      new Date()
+    const connection = await pool.getConnection();
+    
+    // Insert request
+    const [result] = await connection.execute(
+      `INSERT INTO requests (title, type, description, teacher_id, status) 
+       VALUES (?, ?, ?, ?, 'In Progress')`,
+      [title, type, description, teacherId]
     );
 
-    // Store in memory
-    requests.push(newRequest);
+    const requestId = result.insertId;
 
-    // Also save to localStorage via frontend (optional)
+    // Insert documents if any
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await connection.execute(
+          `INSERT INTO request_documents (request_id, file_name, file_path, file_size) 
+           VALUES (?, ?, ?, ?)`,
+          [requestId, file.originalname, file.path, file.size]
+        );
+      }
+    }
+
+    // Fetch the created request with documents
+    const [requests] = await connection.query(
+      `SELECT r.*, GROUP_CONCAT(
+        JSON_OBJECT(
+          'id', d.id,
+          'fileName', d.file_name,
+          'originalName', d.file_name,
+          'path', d.file_path,
+          'size', d.file_size,
+          'uploadedAt', d.uploaded_at
+        )
+      ) as documents FROM requests r 
+      LEFT JOIN request_documents d ON r.id = d.request_id 
+      WHERE r.id = ? 
+      GROUP BY r.id`,
+      [requestId]
+    );
+
+    const newRequest = {
+      ...requests[0],
+      documents: requests[0].documents ? JSON.parse(`[${requests[0].documents}]`) : []
+    };
+
+    connection.release();
+
     res.status(201).json({
       success: true,
       message: 'Request created successfully',
@@ -103,12 +195,12 @@ const createRequest = (req, res) => {
 };
 
 // Update request status
-const updateRequestStatus = (req, res) => {
+const updateRequestStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['In Progress', 'Approved', 'Rejected'];
+    const validStatuses = ['In Progress', 'Approved', 'Rejected', 'To Modify'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -116,18 +208,47 @@ const updateRequestStatus = (req, res) => {
       });
     }
 
-    const request = requests.find(r => r.id == id);
-    if (!request) {
+    const connection = await pool.getConnection();
+    
+    const [result] = await connection.execute(
+      `UPDATE requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [status, id]
+    );
+
+    if (result.affectedRows === 0) {
+      connection.release();
       return res.status(404).json({ success: false, error: 'Request not found' });
     }
 
-    request.status = status;
-    request.updatedAt = new Date();
+    // Fetch updated request
+    const [requests] = await connection.query(
+      `SELECT r.*, GROUP_CONCAT(
+        JSON_OBJECT(
+          'id', d.id,
+          'fileName', d.file_name,
+          'originalName', d.file_name,
+          'path', d.file_path,
+          'size', d.file_size,
+          'uploadedAt', d.uploaded_at
+        )
+      ) as documents FROM requests r 
+      LEFT JOIN request_documents d ON r.id = d.request_id 
+      WHERE r.id = ? 
+      GROUP BY r.id`,
+      [id]
+    );
+
+    const updatedRequest = {
+      ...requests[0],
+      documents: requests[0].documents ? JSON.parse(`[${requests[0].documents}]`) : []
+    };
+
+    connection.release();
 
     res.json({
       success: true,
       message: 'Request status updated successfully',
-      data: request
+      data: updatedRequest
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -135,26 +256,39 @@ const updateRequestStatus = (req, res) => {
 };
 
 // Delete request
-const deleteRequest = (req, res) => {
+const deleteRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const index = requests.findIndex(r => r.id == id);
+    const connection = await pool.getConnection();
 
-    if (index === -1) {
+    // Fetch request with documents to delete files
+    const [requests] = await connection.query(
+      `SELECT * FROM request_documents WHERE request_id = ?`,
+      [id]
+    );
+
+    // Delete associated files from disk
+    for (const doc of requests) {
+      if (doc.file_path && fs.existsSync(doc.file_path)) {
+        try {
+          fs.unlinkSync(doc.file_path);
+        } catch (err) {
+          console.error(`Failed to delete file: ${doc.file_path}`, err);
+        }
+      }
+    }
+
+    // Delete from database (documents will be deleted by foreign key cascade)
+    const [result] = await connection.execute(
+      `DELETE FROM requests WHERE id = ?`,
+      [id]
+    );
+
+    connection.release();
+
+    if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, error: 'Request not found' });
     }
-
-    // Delete associated files
-    const request = requests[index];
-    if (request.documents && request.documents.length > 0) {
-      request.documents.forEach(doc => {
-        if (doc.path && fs.existsSync(doc.path)) {
-          fs.unlinkSync(doc.path);
-        }
-      });
-    }
-
-    requests.splice(index, 1);
 
     res.json({
       success: true,
@@ -166,31 +300,57 @@ const deleteRequest = (req, res) => {
 };
 
 // Search requests
-const searchRequests = (req, res) => {
+const searchRequests = async (req, res) => {
   try {
     const { query, status, type } = req.query;
+    let sql = `SELECT r.*, GROUP_CONCAT(
+      JSON_OBJECT(
+        'id', d.id,
+        'fileName', d.file_name,
+        'originalName', d.file_name,
+        'path', d.file_path,
+        'size', d.file_size,
+        'uploadedAt', d.uploaded_at
+      )
+    ) as documents FROM requests r 
+    LEFT JOIN request_documents d ON r.id = d.request_id 
+    WHERE 1=1`;
     
-    let filtered = requests;
+    const params = [];
 
     if (query) {
-      filtered = filtered.filter(r => 
-        r.title.toLowerCase().includes(query.toLowerCase()) ||
-        r.description.toLowerCase().includes(query.toLowerCase())
-      );
+      sql += ` AND (r.title LIKE ? OR r.description LIKE ?)`;
+      const searchQuery = `%${query}%`;
+      params.push(searchQuery, searchQuery);
     }
 
     if (status) {
-      filtered = filtered.filter(r => r.status === status);
+      sql += ` AND r.status = ?`;
+      params.push(status);
     }
 
     if (type) {
-      filtered = filtered.filter(r => r.type === type);
+      sql += ` AND r.type = ?`;
+      params.push(type);
     }
+
+    sql += ` GROUP BY r.id ORDER BY r.created_at DESC`;
+
+    const connection = await pool.getConnection();
+    const [requests] = await connection.query(sql, params);
+
+    // Parse documents JSON
+    const formattedRequests = requests.map(req => ({
+      ...req,
+      documents: req.documents ? JSON.parse(`[${req.documents}]`) : []
+    }));
+
+    connection.release();
 
     res.json({
       success: true,
-      data: filtered,
-      count: filtered.length
+      data: formattedRequests,
+      count: formattedRequests.length
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

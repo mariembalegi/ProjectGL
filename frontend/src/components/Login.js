@@ -38,38 +38,52 @@ const Login = () => {
     if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Validation locale uniquement - PAS de backend
     const emailInput = formData.email.trim();
     const passwordInput = formData.password.trim();
     
-    console.log('=== VALIDATION FRONTEND UNIQUEMENT ===');
-    console.log('Email saisi:', emailInput);
-    console.log('Password saisi:', passwordInput);
-    
-    // Rechercher l'utilisateur dans le tableau local
-    const user = staticUsers.find(u => 
-      u.email === emailInput && u.password === passwordInput
-    );
-    
-    console.log('Utilisateur trouvé:', user);
-    
-    // Simulation d'un délai de traitement
-    setTimeout(() => {
-      if (user) {
-        console.log('✅ Connexion réussie:', user.email, 'Rôle:', user.role);
-        setUserRole(user.role);
+    console.log('=== LOGGING IN WITH BACKEND ===');
+    console.log('Email:', emailInput);
+
+    try {
+      // Call backend login endpoint
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: emailInput,
+          password: passwordInput
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.user) {
+        console.log('✅ Login successful:', data.user.email, 'Role:', data.user.role);
+        
+        // Store user data in localStorage
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        localStorage.setItem('userId', data.user.id); // Store user ID for API calls
+        localStorage.setItem('userEmail', data.user.email); // Store email as well
+        
+        setUserRole(data.user.role);
         setIsLoggedIn(true);
       } else {
-        console.log('❌ Échec de connexion');
-        setError('Identifiants invalides. Vérifiez votre email et mot de passe.');
+        console.log('❌ Login failed:', data.message);
+        setError(data.message || 'Invalid credentials. Please check your email and password.');
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Unable to connect to server. Please make sure the backend is running on http://localhost:5000');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   // Si l'utilisateur est connecté, afficher la page correspondante selon son rôle

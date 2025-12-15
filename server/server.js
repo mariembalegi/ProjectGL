@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { initializeDatabase } = require('./db/connection');
 
 // Load environment variables
 dotenv.config();
@@ -63,32 +64,41 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 console.log('Attempting to listen on port:', PORT);
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server is running on port ${PORT}`);
-  console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
-  console.log('Listening on all interfaces (0.0.0.0)');
-});
+// Initialize database and start server
+initializeDatabase()
+  .then(() => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server is running on port ${PORT}`);
+      console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
+      console.log('Listening on all interfaces (0.0.0.0)');
+      console.log('Database: Connected');
+    });
 
-server.on('listening', () => {
-  console.log('Server listening event triggered');
-});
+    server.on('listening', () => {
+      console.log('Server listening event triggered');
+    });
 
-// Handle server errors
-server.on('error', (err) => {
-  console.error('❌ Server error:', err);
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use`);
-  }
-  process.exit(1);
-});
+    // Handle server errors
+    server.on('error', (err) => {
+      console.error('❌ Server error:', err);
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use`);
+      }
+      process.exit(1);
+    });
 
-// Global error handlers
-process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
-  process.exit(1);
-});
+    // Global error handlers
+    process.on('uncaughtException', (err) => {
+      console.error('❌ Uncaught Exception:', err);
+      process.exit(1);
+    });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason);
-  process.exit(1);
-});
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('❌ Unhandled Rejection:', reason);
+      process.exit(1);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
