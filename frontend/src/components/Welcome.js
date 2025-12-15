@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './Welcome.css';
 import './Modal.css';
+import { createRequest, getAllRequests } from '../services/api';
 
 const Welcome = () => {
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
@@ -18,8 +19,12 @@ const Welcome = () => {
     description: ''
   });
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const fileInputRef = useRef(null);
   const itemsPerPage = 10;
+  const [conventions, setConventions] = useState([]);
 
   const handleLogout = () => {
     window.location.href = '/';
@@ -79,31 +84,64 @@ const Welcome = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     // Valider le formulaire
     if (!validateForm()) {
       return;
     }
 
-    // Créer une nouvelle convention
-    const newConvention = {
-      id: conventions.length + 1,
-      titre: formData.title,
-      chercheur: formData.description,
-      type: formData.type,
-      date: new Date().toLocaleDateString('en-GB', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-      }),
-      statut: 'In Progress'
-    };
+    try {
+      setLoading(true);
+      setSubmitError('');
+      setSubmitMessage('');
 
-    // Ajouter à la liste
-    setConventions(prev => [newConvention, ...prev]);
-    
-    // Fermer le modal et réinitialiser
-    closeAddModal();
+      // Get teacher ID from localStorage or use default
+      const teacherId = localStorage.getItem('userId') || '1';
+
+      // Submit to backend
+      const result = await createRequest(
+        {
+          title: formData.title,
+          type: formData.type,
+          description: formData.description,
+          teacherId: teacherId
+        },
+        selectedFiles
+      );
+
+      if (result.success) {
+        setSubmitMessage('Request submitted successfully!');
+        
+        // Map backend response to frontend format
+        const newConvention = {
+          id: result.data.id,
+          titre: result.data.title,
+          chercheur: result.data.description,
+          type: result.data.type,
+          date: new Date(result.data.createdAt).toLocaleDateString('en-GB', { 
+            day: '2-digit', 
+            month: 'short', 
+            year: 'numeric' 
+          }),
+          statut: result.data.status,
+          documents: result.data.documents || []
+        };
+
+        // Add to the beginning of the list
+        setConventions(prev => [newConvention, ...prev]);
+        
+        // Close modal and reset form after a short delay
+        setTimeout(() => {
+          closeAddModal();
+          setSubmitMessage('');
+        }, 1500);
+      }
+    } catch (error) {
+      setSubmitError(error.message || 'Failed to submit request');
+      console.error('Error submitting request:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFileUpload = (files) => {
@@ -147,168 +185,38 @@ const Welcome = () => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const [conventions, setConventions] = useState([
-    {
-      id: 1,
-      titre: 'Exchange Agreement',
-      chercheur: 'University exchange program for students',
-      type: 'Student Exchange',
-      date: '15 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 2,
-      titre: 'Double Degree - TU Munich',
-      chercheur: 'Academic partnership for double certification',
-      type: 'Double Degree',
-      date: '12 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 3,
-      titre: 'Training Relocation - MIT',
-      chercheur: 'Opening of a training branch abroad',
-      type: 'Relocation',
-      date: '10 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 4,
-      titre: 'Research Agreement - Oxford',
-      chercheur: 'Scientific research collaboration',
-      type: 'Research',
-      date: '08 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 5,
-      titre: 'Internship Agreement - Sorbonne',
-      chercheur: 'Internship program for students in France',
-      type: 'Student Exchange',
-      date: '05 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 6,
-      titre: 'Partnership - Stanford University',
-      chercheur: 'Academic cooperation and research agreement',
-      type: 'Research',
-      date: '03 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 7,
-      titre: 'Mobility Agreement - Erasmus+',
-      chercheur: 'European mobility program',
-      type: 'Student Exchange',
-      date: '01 Nov 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 8,
-      titre: 'Training Agreement - INSA Lyon',
-      chercheur: 'Specialized engineering training',
-      type: 'Training',
-      date: '30 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 9,
-      titre: 'Research Agreement - CERN',
-      chercheur: 'Participation in particle physics projects',
-      type: 'Research',
-      date: '28 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 10,
-      titre: 'Double Degree - Polytechnique Montreal',
-      chercheur: 'Binational engineering program',
-      type: 'Double Degree',
-      date: '25 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 11,
-      titre: 'Internship Agreement - ETH Zurich',
-      chercheur: 'Research internships in advanced technologies',
-      type: 'Internship',
-      date: '23 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 12,
-      titre: 'Mobility Agreement - University of Tokyo',
-      chercheur: 'Academic exchange with Japan',
-      type: 'Student Exchange',
-      date: '20 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 13,
-      titre: 'Training Agreement - École Centrale Paris',
-      chercheur: 'Elite engineering training',
-      type: 'Training',
-      date: '18 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 14,
-      titre: 'Research Partnership - Harvard Medical',
-      chercheur: 'Collaborative biomedical research',
-      type: 'Research',
-      date: '15 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 15,
-      titre: 'Exchange Agreement - KTH Stockholm',
-      chercheur: 'Nordic exchange program',
-      type: 'Student Exchange',
-      date: '12 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 16,
-      titre: 'Training Agreement - EPFL',
-      chercheur: 'Specialized training in microtechnologies',
-      type: 'Training',
-      date: '10 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 17,
-      titre: 'Research Agreement - Caltech',
-      chercheur: 'Research in space technologies',
-      type: 'Research',
-      date: '08 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 18,
-      titre: 'Double Degree - Imperial College',
-      chercheur: 'Anglo-Tunisian excellence program',
-      type: 'Double Degree',
-      date: '05 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 19,
-      titre: 'Internship Agreement - Siemens AG',
-      chercheur: 'Industrial internships in Germany',
-      type: 'Internship',
-      date: '03 Oct 2025',
-      statut: 'In Progress'
-    },
-    {
-      id: 20,
-      titre: 'Mobility Agreement - McGill University',
-      chercheur: 'Exchange with Canada',
-      type: 'Student Exchange',
-      date: '01 Oct 2025',
-      statut: 'In Progress'
-    }
-  ]);
+  // Load requests from backend on component mount
+  useEffect(() => {
+    const loadRequests = async () => {
+      try {
+        setLoading(true);
+        const result = await getAllRequests();
+        if (result.success && result.data) {
+          // Map backend format to frontend format
+          const mappedConventions = result.data.map(request => ({
+            id: request.id,
+            titre: request.title,
+            chercheur: request.description,
+            type: request.type,
+            date: new Date(request.createdAt).toLocaleDateString('en-GB', { 
+              day: '2-digit', 
+              month: 'short', 
+              year: 'numeric' 
+            }),
+            statut: request.status,
+            documents: request.documents || []
+          }));
+          setConventions(mappedConventions);
+        }
+      } catch (error) {
+        console.error('Error loading requests:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadRequests();
+  }, []);
 
   // Données fictives pour le dashboard - calculated dynamically
   const stats = [
@@ -596,11 +504,23 @@ const Welcome = () => {
       {showAddModal && (
         <div className="modal-overlay" onClick={closeAddModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeAddModal}>
+            <button className="modal-close" onClick={closeAddModal} disabled={loading}>
               <i className="fas fa-times"></i>
             </button>
             
             <h2 className="modal-title">Add New Request</h2>
+            
+            {submitMessage && (
+              <div className="alert alert-success">
+                <i className="fas fa-check-circle"></i> {submitMessage}
+              </div>
+            )}
+            
+            {submitError && (
+              <div className="alert alert-error">
+                <i className="fas fa-exclamation-circle"></i> {submitError}
+              </div>
+            )}
             
             <div className="modal-form">
               <div className="form-group">
@@ -612,7 +532,9 @@ const Welcome = () => {
                   onChange={handleInputChange}
                   placeholder="Enter request title"
                   className={errors.title ? 'error' : ''}
+                  disabled={loading}
                 />
+                {errors.title && <span className="error-text">{errors.title}</span>}
               </div>
               
               <div className="form-group">
@@ -622,6 +544,7 @@ const Welcome = () => {
                   value={formData.type}
                   onChange={handleInputChange}
                   className={errors.type ? 'error' : ''}
+                  disabled={loading}
                 >
                   <option value="" disabled>Select convention type</option>
                   <option value="Student Exchange">Student Exchange</option>
@@ -631,6 +554,7 @@ const Welcome = () => {
                   <option value="Internship">Internship</option>
                   <option value="Relocation">Relocation</option>
                 </select>
+                {errors.type && <span className="error-text">{errors.type}</span>}
               </div>
               
               <div className="form-group">
@@ -642,17 +566,20 @@ const Welcome = () => {
                   placeholder="Enter detailed description" 
                   rows="4"
                   className={errors.description ? 'error' : ''}
+                  disabled={loading}
                 ></textarea>
+                {errors.description && <span className="error-text">{errors.description}</span>}
               </div>
               
               <div className="form-group">
                 <label>Upload Documents</label>
                 <div 
                   className={`file-upload-area ${dragActive ? 'drag-active' : ''} ${errors.documents ? 'error' : ''}`}
-                  onClick={handleFileAreaClick}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
+                  onClick={!loading ? handleFileAreaClick : undefined}
+                  onDragOver={!loading ? handleDragOver : undefined}
+                  onDragLeave={!loading ? handleDragLeave : undefined}
+                  onDrop={!loading ? handleDrop : undefined}
+                  style={{ opacity: loading ? 0.6 : 1, pointerEvents: loading ? 'none' : 'auto' }}
                 >
                   <i className="fas fa-cloud-upload-alt"></i>
                   <p>Drag and drop files here or click to browse</p>
@@ -660,11 +587,12 @@ const Welcome = () => {
                     ref={fileInputRef}
                     type="file" 
                     multiple 
-                    accept=".pdf" 
                     style={{display: 'none'}} 
                     onChange={handleFileInputChange}
+                    disabled={loading}
                   />
                 </div>
+                {errors.documents && <span className="error-text">{errors.documents}</span>}
                 
                 {selectedFiles.length > 0 && (
                   <div className="selected-files">
@@ -676,6 +604,7 @@ const Welcome = () => {
                           type="button" 
                           className="remove-file"
                           onClick={() => removeFile(index)}
+                          disabled={loading}
                         >
                           <i className="fas fa-times"></i>
                         </button>
@@ -687,11 +616,17 @@ const Welcome = () => {
             </div>
             
             <div className="modal-actions">
-              <button className="btn-close" onClick={closeAddModal}>
+              <button className="btn-close" onClick={closeAddModal} disabled={loading}>
                 Cancel
               </button>
-              <button className="btn-primary-modal" onClick={handleSubmitRequest}>
-                Submit Request
+              <button className="btn-primary-modal" onClick={handleSubmitRequest} disabled={loading}>
+                {loading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i> Submitting...
+                  </>
+                ) : (
+                  'Submit Request'
+                )}
               </button>
             </div>
           </div>
